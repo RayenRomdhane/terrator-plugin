@@ -1,9 +1,9 @@
 import Ajv from 'ajv';
 import { DefaultMetadata } from 'leto-modelizer-plugin-core';
-import TerraformComponentDefinition from 'src/models/TerraformComponentDefinition';
-import TerraformComponentAttributeDefinition from 'src/models/TerraformComponentAttributeDefinition';
-import Schema from 'src/metadata/ValidationSchema';
-import providers from 'src/assets/metadata';
+import TerraformComponentDefinition from '../models/TerraformComponentDefinition';
+import TerraformComponentAttributeDefinition from '../models/TerraformComponentAttributeDefinition';
+import Schema from './ValidationSchema';
+import providers from '../assets/metadata';
 
 /**
  * Class to validate and retrieve components definitions from Terraform metadata.
@@ -145,9 +145,11 @@ class TerraformMetadata extends DefaultMetadata {
    */
   getAttributeDefinition(attribute) {
     const subAttributes = attribute.attributes || [];
+    const itemDefinition = attribute.itemDefinition || [];
     return new TerraformComponentAttributeDefinition({
       ...attribute,
       definedAttributes: subAttributes.map(this.getAttributeDefinition),
+      itemDefinition: itemDefinition.map(this.getAttributeDefinition),
     });
   }
 

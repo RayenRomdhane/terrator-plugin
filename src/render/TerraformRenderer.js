@@ -1,5 +1,5 @@
 import nunjucks from 'nunjucks';
-import templates from 'src/render/TerraformTemplate';
+import templates from './TerraformTemplate';
 import {
   DefaultRender,
   FileInput,
@@ -30,6 +30,17 @@ class TerraformRenderer extends DefaultRender {
       lstripBlocks: true,
     });
     this.template = nunjucks.compile(templates.root, env);
+  }
+
+  getListType(value) {
+    return value.split(/\(([^)]+)\)/)[1];
+  }
+
+  getListTypeWrapper(value) {
+    if (typeof value === 'object') {
+      return 'object';
+    }
+    return this.getListType(value);
   }
 
   /**
@@ -97,9 +108,10 @@ class TerraformRenderer extends DefaultRender {
           locals: allVariables.filter((v) => v.category === 'local'),
           outputs: allVariables.filter((v) => v.category === 'output'),
           // This might cause issues with other providers.
-          isValueReference: (value) => value?.match(/^(data.|var.|local.|module.|aws_|random_)/),
+          isValueReference: (value) => typeof value === 'string' && value?.match(/^(data.|var.|local.|module.|aws_|random_)/),
           isList: (type) => type?.startsWith('list(') || type?.startsWith('set('),
-          getListType: (value) => value.split(/\(([^)]+)\)/)[1],
+          getListType: (value) => this.getListType(value),
+          getListTypeWrapper: (value) => this.getListTypeWrapper(value),
         }).trim()}\n`,
       }));
 

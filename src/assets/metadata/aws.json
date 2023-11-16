@@ -537,6 +537,7 @@
       "description": "A security group controls the traffic that is allowed to reach and leave the resources that it is associated with.",
       "icon": "AwsSecurityGroup",
       "model": "DefaultModel",
+      "itemType": "",
       "url": "https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html",
       "attributes": [
         {
@@ -629,46 +630,52 @@
           "name": "ingress",
           "displayName": "Ingress",
           "description": "Configuration block for Ingress rules",
-          "type": "Object",
+          "type": "Array",
+          "itemType": "Object",
           "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#ingress",
-          "attributes": [
+          "itemDefinition": [
             {
-              "name": "from_port",
-              "displayName": "From port",
-              "description": "Start port (or ICMP type number if protocol is icmp).",
-              "required": true,
-              "type": "Number",
-              "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#from_port"
-            },
-            {
-              "name": "to_port",
-              "displayName": "To port",
-              "description": "End port (or ICMP code if protocol is icmp).",
-              "required": true,
-              "type": "Number",
-              "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#to_port"
-            },
-            {
-              "name": "protocol",
-              "displayName": "Protocol",
-              "description": "The protocol. If not icmp, tcp, udp, or all use the -1 protocol number.",
-              "required": true,
-              "type": "String",
-              "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#protocol"
-            },
-            {
-              "name": "cidr_blocks",
-              "displayName": "CIDR blocks",
-              "description": "List of CIDR blocks.",
-              "type": "Array",
-              "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#cidr_blocks"
-            },
-            {
-              "name": "ipv6_cidr_blocks",
-              "displayName": "IPv6 CIDR blocks",
-              "description": "List of IPv6 CIDR blocks.",
-              "type": "Array",
-              "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#ipv6_cidr_blocks"
+              "type":"Object",
+              "attributes": [
+                {
+                  "name": "from_port",
+                  "displayName": "From port",
+                  "description": "Start port (or ICMP type number if protocol is icmp).",
+                  "required": true,
+                  "type": "Number",
+                  "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#from_port"
+                },
+                {
+                  "name": "to_port",
+                  "displayName": "To port",
+                  "description": "End port (or ICMP code if protocol is icmp).",
+                  "required": true,
+                  "type": "Number",
+                  "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#to_port"
+                },
+                {
+                  "name": "protocol",
+                  "displayName": "Protocol",
+                  "description": "The protocol. If not icmp, tcp, udp, or all use the -1 protocol number.",
+                  "required": true,
+                  "type": "String",
+                  "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#protocol"
+                },
+                {
+                  "name": "cidr_blocks",
+                  "displayName": "CIDR blocks",
+                  "description": "List of CIDR blocks.",
+                  "type": "Array",
+                  "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#cidr_blocks"
+                },
+                {
+                  "name": "ipv6_cidr_blocks",
+                  "displayName": "IPv6 CIDR blocks",
+                  "description": "List of IPv6 CIDR blocks.",
+                  "type": "Array",
+                  "url": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#ipv6_cidr_blocks"
+                }
+              ]
             }
           ]
         },

@@ -3,7 +3,12 @@
   "version": "0.7.1",
   "description": "Terraform plugin for Leto-Modelizer.",
   "main": "dist/terrator-plugin.js",
-  "exports": "./dist/terrator-plugin.js",
+  "exports": {
+    ".": {
+      "development": "./src",
+      "default": "./dist/terrator-plugin.js"
+    }
+  },
   "scripts": {
     "build": "webpack",
     "build:resources": "node scripts/generateResources.js",
@@ -33,7 +38,7 @@
   "homepage": "https://github.com/ditrit/terrator-plugin#readme",
   "dependencies": {
     "antlr4": "=4.13.1",
-    "leto-modelizer-plugin-core": "github:ditrit/leto-modelizer-plugin-core#0.22.0",
+    "leto-modelizer-plugin-core": "file:../leto-modelizer-plugin-core",
     "nunjucks": "=3.2.4"
   },
   "devDependencies": {

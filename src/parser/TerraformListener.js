@@ -1,9 +1,9 @@
 /* eslint class-methods-use-this: 0 */
 import antlr4 from 'antlr4';
-import TerraformVariable from 'src/models/TerraformVariable';
-import TerraformComponentAttribute from 'src/models/TerraformComponentAttribute';
-import TerraformComponentDefinition from 'src/models/TerraformComponentDefinition';
-import TerraformComponent from 'src/models/TerraformComponent';
+import TerraformVariable from '../models/TerraformVariable';
+import TerraformComponentAttribute from '../models/TerraformComponentAttribute';
+import TerraformComponentDefinition from '../models/TerraformComponentDefinition';
+import TerraformComponent from '../models/TerraformComponent';
 
 const getText = (ctx) => ctx.getText().replaceAll('"', '').trim();
 
@@ -539,7 +539,15 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   // Exit a parse tree produced by terraformParser#list_.
   exitList_() {
     if (this.currentField) {
-      this.currentField.type = 'Array';
+      console.log('I exit');
+      // If the type is 'Array' and itemType is 'Object', treat it as an array of objects
+      if (this.currentField.type === 'Array' && this.currentField.itemType === 'Object') {
+        this.currentField.type = 'Array';
+        this.currentField.value = this.currentField.value.map((item) => ({
+          type: 'Object',
+          value: item,
+        }));
+      }
     }
   }
 

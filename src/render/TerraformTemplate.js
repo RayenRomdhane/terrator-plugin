@@ -22,28 +22,50 @@ const block = `{% for _block in components %}
 
 {% endfor %}`;
 
-const attribute = `{% if attribute.type == 'Object' %}
+const attribute = `
+{% if attribute.type == 'Object' %}
+   {% include 'attributeObject' ignore missing %}
+{% elif attribute.type == 'Array' %}
+   {% if attribute.definition.itemType == 'Object' %}
+      {% include 'attributeArrayOfObjects' ignore missing %}
+   {% else %}
+      {% include 'attributeArray' ignore missing %}
+   {% endif %}
+{% else %}
+   {{- attribute.name | indent(level * 4, true) }} = {% if attribute.isVariable %}{{ attribute.value }}
+   {% elif attribute.definition.type == 'Reference' %}{{ attribute.definition.containerRef }}.{{ attribute.value }}
+   {% elif attribute.type in ['Boolean', 'Number', 'String'] or attribute.name == 'user_data' %}{{ attribute.value }}
+   {% elif attribute.type == 'String' and isValueReference(attribute.value) %}{{ attribute.value }}
+   {% else %}
+      {{- attribute.value if attribute.value !== null | dump }}
+   {% endif %}
+{% endif %}
+`;
+
+const attributeObject = `
 {{ attribute.name | indent(level * 4, true) }} {% if not attribute.isDynamic %}= {% endif %}{
-{% set level = level+1 %}{% for attr in attribute.value %}{% set attribute = attr %}
-{% include "attribute" ignore missing %}
+{% set level = level + 1 %}{% for attr in attribute.value %}{% set attribute = attr %}
+{% include 'attribute' ignore missing %}
 {% set attribute = attr %}
-{% endfor %}{% set level = level-1 %}
-{{ "}" | indent(level * 4, true)  }}
-{% else %}
-{{ attribute.name | indent(level * 4, true) }} = {% if attribute.type == 'Array' %}[
-{% set level = level+1 %}{% for value in attribute.value %}
-{% call displayAttributeValue(attribute, value, level) -%}{%- endcall %}
-{% endfor %}{% set level = level-1 %}
+{% endfor %}{% set level = level - 1 %}
+{{ "}" | indent(level * 4, true) }}
+`;
+
+const attributeArray = `
+{{ attribute.name | indent(level * 4, true) }} = [
+{% set level = level + 1 %}{% for value in attribute.value %}
+{{- displayAttributeValue(attribute, value, level) }}
+{% endfor %}{% set level = level - 1 %}
 {{ "]" | indent(level * 4, true) }}
-{% else %}
-{% if attribute.isVariable %}{{ attribute.value }}
-{% elif attribute.definition.type == 'Reference' %}{{ attribute.definition.containerRef }}.{{ attribute.value }}
-{% elif attribute.type == 'Boolean' or attribute.type == 'Number' or attribute.name == 'user_data' %}{{ attribute.value }}
-{% elif attribute.type == 'String' and isValueReference(attribute.value) %}{{ attribute.value }}
-{% else %}{{ attribute.value | dump }}
-{% endif %}
-{% endif %}
-{% endif %}
+`;
+
+const attributeArrayOfObjects = `
+{{ attribute.name | indent(level * 4, true) }} = [
+{% for item in attribute.value %}
+  {% include "attributeObject" with { attribute: item, level: level } %}
+  {{ "," if not loop.last }}
+{% endfor %}
+{{ "]" | indent(level * 4, true) }}
 `;
 
 const variable = `{% for variable in variables %}
@@ -123,6 +145,9 @@ export default {
   root,
   block,
   attribute,
+  attributeObject,
+  attributeArray,
+  attributeArrayOfObjects,
   variable,
   output,
   local,

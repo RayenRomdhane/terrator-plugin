@@ -1,5 +1,5 @@
 import { Component } from 'leto-modelizer-plugin-core';
-import TerraformComponentAttribute from 'src/models/TerraformComponentAttribute';
+import TerraformComponentAttribute from './TerraformComponentAttribute';
 
 /**
  * Specific Terraform component.
