@@ -19,6 +19,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     this.currentBlockType = null;
     this.currentField = null;
     this.currentObjectField = null;
+    this.arrayStack = [];
     this.currentFile = null;
     this.fieldsTree = [];
     this.currentVariable = null;
@@ -41,7 +42,12 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   }
 
   getAttributeDefinition(object, name) {
-    return object.definition?.definedAttributes.find((def) => def.name === name) || null;
+    let definition = object.definition?.definedAttributes.find((def) => def.name === name) || null;
+    if (!definition) {
+      definition = object.definition?.itemDefinition[0]
+        .definedAttributes.find((def) => def.name === name) || null;
+    }
+    return definition;
   }
 
   isVariable() {
@@ -169,14 +175,12 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   enterBlock(ctx) {
     const name = getText(ctx.blocktype());
     let definition;
-
     if (this.currentObjectField) {
       this.fieldsTree.push(this.currentObjectField);
       definition = this.getAttributeDefinition(this.currentObjectField, name);
     } else {
       definition = this.getAttributeDefinition(this.currentComponent, name);
     }
-
     this.currentObjectField = new TerraformComponentAttribute({
       name,
       value: [],
@@ -190,9 +194,11 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   exitBlock() {
     if (this.fieldsTree.length > 0) {
       const field = this.fieldsTree.pop();
-
       field.value.push(this.currentObjectField);
       this.currentObjectField = field;
+    } else if (this.arrayStack.length > 0) {
+      this.currentComponent.attributes.push(this.arrayStack.at(-1));
+      this.currentObjectField = null;
     } else {
       this.currentComponent.attributes.push(this.currentObjectField);
       this.currentObjectField = null;
@@ -256,12 +262,25 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
 
   // Enter a parse tree produced by terraformParser#argument.
   enterArgument(ctx) {
-    if (ctx.expression()?.section()?.map_()) {
+    if (ctx.expression().section().list_()) {
       if (this.currentObjectField) {
         this.fieldsTree.push(this.currentObjectField);
       }
       const name = ctx.identifier().getText();
-
+      this.arrayStack.push(new TerraformComponentAttribute({
+        name,
+        type: 'Array',
+        value: [],
+        definition: this.getAttributeDefinition(
+          this.arrayStack.at(-1) || this.currentComponent,
+          name,
+        ),
+      }));
+    } else if (ctx.expression()?.section()?.map_()) {
+      if (this.currentObjectField) {
+        this.fieldsTree.push(this.currentObjectField);
+      }
+      const name = ctx.identifier().getText();
       this.currentObjectField = new TerraformComponentAttribute({
         name,
         type: 'Object',
@@ -302,9 +321,21 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
       }
     } else if (this.currentBlockType === 'local') {
       this.addVariable();
+    } else if (this.arrayStack.length > 0) {
+      if (this.currentField) {
+        this.currentField.name = ctx.identifier().getText();
+        this.currentField.definition = this.getAttributeDefinition(
+          this.arrayStack.at(-1),
+          this.currentField.name,
+        );
+        if (this.arrayStack.at(-1).definition.itemDefinition[0]) {
+          this.currentObjectField.value.push(this.currentField);
+        } else {
+          this.arrayStack.at(-1).value.push(this.currentField);
+        }
+      }
     } else if (this.currentField) {
       this.currentField.name = ctx.identifier().getText();
-
       if (this.currentObjectField) {
         this.currentObjectField.value.push(this.currentField);
         this.currentField.definition = this.getAttributeDefinition(
@@ -320,7 +351,6 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
       }
     } else {
       this.currentObjectField.name = ctx.identifier().getText();
-
       if (this.fieldsTree.length > 0) {
         const field = this.fieldsTree.pop();
         field.value.push(this.currentObjectField);
@@ -389,11 +419,32 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   }
 
   // Enter a parse tree produced by terraformParser#expression.
-  enterExpression() {
+  enterExpression(ctx) {
+    if (this.arrayStack.length > 0 && this.arrayStack.at(-1).definition.itemDefinition[0]) {
+      if (ctx.parentCtx.ruleIndex === 28) {
+        this.currentObjectField = new TerraformComponentAttribute({
+          name: null,
+          type: 'Object',
+          value: [],
+          definition: this.arrayStack.at(-1).definition.itemDefinition[0],
+          // this.getAttributeDefinition(
+          //   this.currentObjectField || this.currentComponent,
+          //   null,
+          // ),
+        });
+      }
+    }
   }
 
   // Exit a parse tree produced by terraformParser#expression.
-  exitExpression() {
+  exitExpression(ctx) {
+    if (this.arrayStack.length > 0 && this.arrayStack.at(-1).definition.itemDefinition[0]) {
+      if (ctx.parentCtx.ruleIndex === 28) {
+        if (this.currentObjectField) {
+          this.arrayStack.at(-1).value.push(this.currentObjectField);
+        }
+      }
+    }
   }
 
   // Enter a parse tree produced by terraformParser#forloop.
@@ -409,7 +460,6 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     if (!this.currentField && !this.isVariable()) {
       if (ctx.val()?.identifier()) {
         const val = getText(ctx.val());
-
         this.currentField = new TerraformComponentAttribute({
           type: 'String',
           value: val === 'null' ? null : val,
@@ -442,7 +492,6 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     }
 
     const value = getText(ctx);
-
     return {
       value: value === 'null' ? null : value,
       type: 'String',
@@ -452,10 +501,8 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   // Exit a parse tree produced by terraformParser#val.
   exitVal(ctx) {
     const { value, type } = this.getFieldValueTypeFromContext(ctx);
-
     if (this.isVariable() || this.currentBlockType === 'local') {
       const listType = this.attributeTypeToVariableType(type);
-
       if (Array.isArray(this.currentVariable[this.currentVariableField])) {
         this.currentVariable[this.currentVariableField].push(value);
 
@@ -538,8 +585,21 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
 
   // Exit a parse tree produced by terraformParser#list_.
   exitList_() {
-    if (this.currentField) {
-      console.log('I exit');
+    /* this.currentArrayField.value.foreach((elt) => {
+      elt.value.foreach((e) => {
+        if (e === null) {
+          elt.value.pop();
+        }
+      });
+    }); */
+    if (this.arrayStack.length > 0) {
+      if (this.arrayStack.length > 1) {
+        this.arrayStack = this.arrayStack.slice(0, -1);
+      } else {
+        this.currentComponent.attributes.push(this.arrayStack.at(-1));
+      }
+    }
+    /* {
       // If the type is 'Array' and itemType is 'Object', treat it as an array of objects
       if (this.currentField.type === 'Array' && this.currentField.itemType === 'Object') {
         this.currentField.type = 'Array';
@@ -548,7 +608,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
           value: item,
         }));
       }
-    }
+    } */
   }
 
   // Enter a parse tree produced by terraformParser#map_.
