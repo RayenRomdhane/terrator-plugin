@@ -12,9 +12,9 @@ const awsSecGroupDefinition = metadata.pluginData.definitions.components.find(({
 const nameAttributeDefinition = awsSecGroupDefinition.definedAttributes.find(({ name }) => name === 'name');
 const descriptionAttributeDefinition = awsSecGroupDefinition.definedAttributes.find(({ name }) => name === 'description');
 const ingressAttributeDefinition = awsSecGroupDefinition.definedAttributes.find(({ name }) => name === 'ingress');
-const ingressFromPortAttributeDefinition = ingressAttributeDefinition.definedAttributes.find(({ name }) => name === 'from_port');
-const ingressToPortAttributeDefinition = ingressAttributeDefinition.definedAttributes.find(({ name }) => name === 'to_port');
-const ingressProtocolAttributeDefinition = ingressAttributeDefinition.definedAttributes.find(({ name }) => name === 'protocol');
+const ingressFromPortAttributeDefinition = ingressAttributeDefinition.itemDefinition[0].definedAttributes.find(({ name }) => name === 'from_port');
+const ingressToPortAttributeDefinition = ingressAttributeDefinition.itemDefinition[0].definedAttributes.find(({ name }) => name === 'to_port');
+const ingressProtocolAttributeDefinition = ingressAttributeDefinition.itemDefinition[0].definedAttributes.find(({ name }) => name === 'protocol');
 const egressAttributeDefinition = awsSecGroupDefinition.definedAttributes.find(({ name }) => name === 'egress');
 const egressFromPortAttributeDefinition = egressAttributeDefinition.definedAttributes.find(({ name }) => name === 'from_port');
 const egressToPortAttributeDefinition = egressAttributeDefinition.definedAttributes.find(({ name }) => name === 'to_port');
@@ -42,27 +42,34 @@ export default [
       }),
       new TerraformComponentAttribute({
         name: 'ingress',
-        type: 'Object',
+        type: 'Array',
         isDynamic: true,
         definition: ingressAttributeDefinition,
         value: [
           new TerraformComponentAttribute({
-            name: 'from_port',
-            type: 'Number',
-            value: 0,
-            definition: ingressFromPortAttributeDefinition,
-          }),
-          new TerraformComponentAttribute({
-            name: 'to_port',
-            type: 'Number',
-            value: 0,
-            definition: ingressToPortAttributeDefinition,
-          }),
-          new TerraformComponentAttribute({
-            name: 'protocol',
-            type: 'String',
-            value: '-1',
-            definition: ingressProtocolAttributeDefinition,
+            type: 'Object',
+            isDynamic: true,
+            definition: ingressAttributeDefinition.itemDefinition[0],
+            value: [
+              new TerraformComponentAttribute({
+                name: 'from_port',
+                type: 'Number',
+                value: 0,
+                definition: ingressFromPortAttributeDefinition,
+              }),
+              new TerraformComponentAttribute({
+                name: 'to_port',
+                type: 'Number',
+                value: 0,
+                definition: ingressToPortAttributeDefinition,
+              }),
+              new TerraformComponentAttribute({
+                name: 'protocol',
+                type: 'String',
+                value: '-1',
+                definition: ingressProtocolAttributeDefinition,
+              }),
+            ],
           }),
         ],
       }),

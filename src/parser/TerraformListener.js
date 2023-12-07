@@ -18,8 +18,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     this.currentComponent = null;
     this.currentBlockType = null;
     this.currentField = null;
-    this.currentObjectField = null;
-    this.arrayStack = [];
+    this.currentArrayOfObjectField = null;
     this.currentFile = null;
     this.fieldsTree = [];
     this.currentVariable = null;
@@ -31,9 +30,6 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     this.components.push(this.currentComponent);
     this.currentComponent = null;
     this.currentBlockType = null;
-    this.arrayStack = [];
-    this.currentObjectField = null;
-    this.currentField = null;
     this.fieldsTree = [];
   }
 
@@ -45,15 +41,13 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   }
 
   getAttributeDefinition(object, name) {
-    let definition = object?.definition?.definedAttributes.find((def) => def.name === name) || null;
+    let definition = object.definition?.definedAttributes.find((def) => def.name === name);
+
     if (!definition) {
-      if (object?.definition?.itemDefinition) {
-        definition = object.definition?.itemDefinition[0]
-          .definedAttributes.find((def) => def.name === name) || null;
-      }
+      definition = object.definition?.itemDefinition?.at(0)
+        ?.definedAttributes.find((def) => def.name === name);
     }
-    return definition;
-    // return object.definition?.definedAttributes.find((def) => def.name === name) || null;
+    return definition || null;
   }
 
   isVariable() {
@@ -181,34 +175,65 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   enterBlock(ctx) {
     const name = getText(ctx.blocktype());
     let definition;
+
     if (this.currentObjectField) {
       this.fieldsTree.push(this.currentObjectField);
       definition = this.getAttributeDefinition(this.currentObjectField, name);
     } else {
       definition = this.getAttributeDefinition(this.currentComponent, name);
     }
-    this.currentObjectField = new TerraformComponentAttribute({
-      name,
-      value: [],
-      type: 'Object',
-      definition,
-      isDynamic: true,
-    });
+
+    if (definition?.type === 'Array') {
+      const attribute = this.currentComponent.attributes.find((attr) => attr?.name === name);
+      if (attribute) {
+        this.currentArrayOfObjectField = attribute;
+      } else {
+        this.currentArrayOfObjectField = new TerraformComponentAttribute({
+          name,
+          value: [],
+          type: 'Array',
+          definition,
+          isDynamic: true,
+        });
+      }
+      this.currentObjectField = new TerraformComponentAttribute({
+        value: [],
+        type: 'Object',
+        definition: definition.itemDefinition[0],
+        isDynamic: true,
+      });
+    } else {
+      this.currentObjectField = new TerraformComponentAttribute({
+        name,
+        value: [],
+        type: 'Object',
+        definition,
+        isDynamic: true,
+      });
+    }
   }
 
   // Exit a parse tree produced by terraformParser#block.
   exitBlock() {
-    if (this.fieldsTree.length > 0) {
+    if (this.currentArrayOfObjectField) {
+      this.currentArrayOfObjectField.value.push(this.currentObjectField);
+      const attribute = this.currentComponent.attributes
+        .find(({ name }) => name === this.currentArrayOfObjectField.name);
+
+      if (!attribute) {
+        this.currentComponent.attributes.push(this.currentArrayOfObjectField);
+      }
+      this.currentObjectField = null;
+      this.currentArrayOfObjectField = null;
+    } else if (this.fieldsTree.length > 0) {
       const field = this.fieldsTree.pop();
       field.value.push(this.currentObjectField);
       this.currentObjectField = field;
-    } else if (this.arrayStack.length > 0) {
-      this.currentComponent.attributes.push(this.arrayStack.at(-1));
-      this.currentObjectField = null;
     } else {
       this.currentComponent.attributes.push(this.currentObjectField);
       this.currentObjectField = null;
     }
+    console.log('just pushed into component: ', this.currentComponent.attributes);
   }
 
   // Enter a parse tree produced by terraformParser#blocktype.
@@ -268,28 +293,12 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
 
   // Enter a parse tree produced by terraformParser#argument.
   enterArgument(ctx) {
-    if (ctx.expression().section().list_()) {
-      console.log(ctx.getText(), this.arrayStack.length);
+    if (ctx.expression()?.section()?.map_()) {
       if (this.currentObjectField) {
         this.fieldsTree.push(this.currentObjectField);
       }
       const name = ctx.identifier().getText();
-      const definition = this.getAttributeDefinition(
-        this.arrayStack.at(-1) || this.currentComponent,
-        name,
-      );
-      console.log(definition);
-      this.arrayStack.push(new TerraformComponentAttribute({
-        name,
-        type: 'Array',
-        value: [],
-        definition,
-      }));
-    } else if (ctx.expression()?.section()?.map_()) {
-      if (this.currentObjectField) {
-        this.fieldsTree.push(this.currentObjectField);
-      }
-      const name = ctx.identifier().getText();
+
       this.currentObjectField = new TerraformComponentAttribute({
         name,
         type: 'Object',
@@ -330,34 +339,9 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
       }
     } else if (this.currentBlockType === 'local') {
       this.addVariable();
-    } else if (this.arrayStack.length > 0) {
-      console.log(this.currentComponent);
-      if (this.currentField) {
-        console.log(this.currentField);
-        this.currentField.name = ctx.identifier().getText();
-        if (this.arrayStack.at(-1).name !== this.currentField.name) {
-          this.currentField.definition = this.getAttributeDefinition(
-            this.arrayStack.at(-1),
-            this.currentField.name,
-          );
-        } else {
-          this.currentField.definition = this.getAttributeDefinition(
-            this.currentComponent,
-            this.currentField.name,
-          );
-          this.currentComponent.attributes.push(this.currentField);
-          this.arrayStack = this.arrayStack.slice(0, -1);
-        }
-        if (this.arrayStack.length > 0 && this.arrayStack.at(-1)?.definition) {
-          console.log(this.currentComponent);
-          this.currentObjectField?.value.push(this.currentField);
-          console.log(this.currentField);
-        } else {
-          this.arrayStack.at(-1)?.value.push(this.currentField);
-        }
-      }
     } else if (this.currentField) {
       this.currentField.name = ctx.identifier().getText();
+
       if (this.currentObjectField) {
         this.currentObjectField.value.push(this.currentField);
         this.currentField.definition = this.getAttributeDefinition(
@@ -373,6 +357,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
       }
     } else {
       this.currentObjectField.name = ctx.identifier().getText();
+
       if (this.fieldsTree.length > 0) {
         const field = this.fieldsTree.pop();
         field.value.push(this.currentObjectField);
@@ -441,39 +426,11 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   }
 
   // Enter a parse tree produced by terraformParser#expression.
-  enterExpression(ctx) {
-    // console.log(this.arrayStack.length, this.arrayStack);
-    if (this.arrayStack.length > 0) {
-      if (this.arrayStack.at(-1).definition?.itemDefinition?.at(0)) {
-        if (ctx.parentCtx.ruleIndex === 28) {
-          console.log(ctx.parentCtx.ruleIndex, ctx.getText());
-          this.currentObjectField = new TerraformComponentAttribute({
-            name: null,
-            type: 'Object',
-            value: [],
-            definition: this.arrayStack.at(-1).definition?.itemDefinition[0],
-            // this.getAttributeDefinition(
-            //   this.currentObjectField || this.currentComponent,
-            //   null,
-            // ),
-          });
-        }
-      }
-    }
+  enterExpression() {
   }
 
   // Exit a parse tree produced by terraformParser#expression.
-  exitExpression(ctx) {
-    if (this.arrayStack.length > 0) {
-      if (this.arrayStack.at(-1).definition) {
-        if (ctx.parentCtx.ruleIndex === 28) {
-          if (this.currentObjectField) {
-            this.arrayStack.at(-1).value.push(this.currentObjectField);
-            console.log(this.currentObjectField);
-          }
-        }
-      }
-    }
+  exitExpression() {
   }
 
   // Enter a parse tree produced by terraformParser#forloop.
@@ -489,6 +446,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     if (!this.currentField && !this.isVariable()) {
       if (ctx.val()?.identifier()) {
         const val = getText(ctx.val());
+
         this.currentField = new TerraformComponentAttribute({
           type: 'String',
           value: val === 'null' ? null : val,
@@ -521,6 +479,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
     }
 
     const value = getText(ctx);
+
     return {
       value: value === 'null' ? null : value,
       type: 'String',
@@ -530,8 +489,10 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   // Exit a parse tree produced by terraformParser#val.
   exitVal(ctx) {
     const { value, type } = this.getFieldValueTypeFromContext(ctx);
+
     if (this.isVariable() || this.currentBlockType === 'local') {
       const listType = this.attributeTypeToVariableType(type);
+
       if (Array.isArray(this.currentVariable[this.currentVariableField])) {
         this.currentVariable[this.currentVariableField].push(value);
 
@@ -594,8 +555,7 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
   }
 
   // Enter a parse tree produced by terraformParser#list_.
-  enterList_(ctx) {
-    console.log(ctx.getText(), this.currentField);
+  enterList_() {
     if (!this.currentField) {
       this.currentField = new TerraformComponentAttribute({
         type: 'Array',
@@ -615,32 +575,9 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
 
   // Exit a parse tree produced by terraformParser#list_.
   exitList_() {
-    /* this.currentArrayField.value.foreach((elt) => {
-      elt.value.foreach((e) => {
-        if (e === null) {
-          elt.value.pop();
-        }
-      });
-    }); */
-    console.log(this.currentField, this.arrayStack);
-    if (this.arrayStack.length > 0) {
-      if (this.arrayStack.length > 1) {
-        this.arrayStack = this.arrayStack.slice(0, -1);
-      } else if (this.arrayStack.at(-1).definition?.itemDefinition?.at(0)) {
-        this.currentComponent.attributes.push(this.arrayStack.at(-1));
-      }
+    if (this.currentField) {
+      this.currentField.type = 'Array';
     }
-
-    /* {
-      // If the type is 'Array' and itemType is 'Object', treat it as an array of objects
-      if (this.currentField.type === 'Array' && this.currentField.itemType === 'Object') {
-        this.currentField.type = 'Array';
-        this.currentField.value = this.currentField.value.map((item) => ({
-          type: 'Object',
-          value: item,
-        }));
-      }
-    } */
   }
 
   // Enter a parse tree produced by terraformParser#map_.
