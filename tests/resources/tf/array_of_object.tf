@@ -6,12 +6,12 @@
         to_port = 80
         protocol = "TCP"
         cidr_blocks = [
-            "QSD",
-            "LJKK",
+            "192.2.0.0/24",
+            "192.3.0.0/24",
         ]
         ipv6_cidr_blocks = [
-            "SDQ5",
-            "SDF58",
+            "2001:db8::/32",
+            "2001:db7::/32",
         ]
     }
 
@@ -20,12 +20,12 @@
         to_port = 90
         protocol = "UDP"
         cidr_blocks = [
-            "QSqsdD",
-            "LJKsdfK",
+            "192.15.0.0/24",
+            "192.16.0.0/24",
         ]
         ipv6_cidr_blocks = [
-            "SDQxzqsdqsqsd5",
-            "SDF5qsdddfg8",
+            "2001:dc8::/32",
+            "2001:dc7::/32",
         ]
     }
 }

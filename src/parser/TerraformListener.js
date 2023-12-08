@@ -233,7 +233,6 @@ class TerraformListener extends antlr4.tree.ParseTreeListener {
       this.currentComponent.attributes.push(this.currentObjectField);
       this.currentObjectField = null;
     }
-    console.log('just pushed into component: ', this.currentComponent.attributes);
   }
 
   // Enter a parse tree produced by terraformParser#blocktype.
